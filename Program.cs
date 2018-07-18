@@ -254,8 +254,13 @@ namespace TymFollower
         {
             Tym.SaveTymList("tyms.dat", gatheredTyms, true);
         }
-
-        static bool IsTym(User user)
+        /// <summary>
+        /// あるアカウントが戸山生がどうか判定する。
+        /// </summary>
+        /// <param name="user">判定対象のユーザー。</param>
+        /// <param name="rateSearch">そのユーザーのフォロワーに占める戸山生の割合を検索に使用する。</param>
+        /// <returns></returns>
+        static bool IsTym(User user, Tokens tokens = null,List<Tym> GatheredTym = null, bool rateSearch = false)
         {
             string desc = user.Description;
             string[] keywords = { "戸山", "とやま", "tym", "Tym", "TYM", "Toyama", "TOYAMA", "toyama", "めめち", "めめ物", "めめ化", "めめ生", "めめ地学", "めめ地", "めめ数", "めめぶつ", "めめか", "めめなま", "めめちがく" };
@@ -264,12 +269,80 @@ namespace TymFollower
             {
                 if (desc.Contains(keyword)) isTym = true;
             }
+            if (isTym)
+            {
+                Console.ForegroundColor = ConsoleColor.Magenta;
+                Console.WriteLine("■プロフィールから戸山生であると推測されます。");
+            }
+            else
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("□プロフィールから戸山生かどうか判別できませんでした。");
+            }
+
+            if(!isTym && rateSearch)
+            {
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.WriteLine("□フォロワーに占める既知の戸山生の割合を調査します。");
+                if (user.IsProtected)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("□鍵アカのフォロワーは調査できません。スキップします。");
+                    return isTym;
+                }
+                //フォロワーにしめる戸山生の割合を調べる。
+                if (tokens == null || GatheredTym == null)
+                {
+                    Console.ForegroundColor = ConsoleColor.Gray;
+                    throw new NullReferenceException("引数が不正（null）です。");
+                }
+                Cursored<User> followers = tokens.Followers.List(user_id: user.Id.Value, count: 200);
+                int tymCount = 0;
+                foreach (User follower in followers)
+                {
+                    if (GatheredTym.Contains(new Tym(follower, false))) tymCount++;
+                }
+                float rate = (float)tymCount / followers.Count;
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.WriteLine("□フォロワーに占める既知の戸山生の割合：　" + (rate*100).ToString());
+                if (rate > 0.4f)
+                {
+                    Console.ForegroundColor = ConsoleColor.Magenta;
+                    Console.WriteLine("■フォロワーに占める既知の戸山生の割合から戸山生であると推測されます。");
+                    isTym = true;
+                }
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("□フォロワーに占める既知の戸山生の割から戸山生かどうか判別できませんでした。");
+                }
+
+            }
+            Console.ForegroundColor = ConsoleColor.Gray;
             return isTym;
         }
 
         static void ShowHelp()
         {
+            Console.ForegroundColor = ConsoleColor.Magenta;
             Console.WriteLine("TwitterのAPI制限によりリクエストは15回/15分に制限されます");
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("\n--------アカウント表示の見方--------");
+            Console.WriteLine("●<ACTIVE>3B「アイデンティティ」@戸山祭 (@AIdentity_3B) (907235856020148225) ☆戸山高校 3B制作の映画 #AIdentity に関する情報をお届けします。脚本はオリジナル。2018.9戸山祭にて上映。フォローよろしくお願いします！");
+            Console.WriteLine("[アカウントの状態] [   アカウント名   ] (@    [ID]    ) ([     数値ID     ]) ☆[説明文]");
+            Console.WriteLine("\n--------アカウントの状態について--------");
+            Console.WriteLine("●<ACTIVE>\t過去30日以内に更新のあるアカウントです。");
+            Console.WriteLine("○<INACTIVE>\t過去30日以内に更新のない非活動的なアカウントです。");
+            Console.WriteLine("□<LOCKED>\t鍵のついたアカウントです。");
+            Console.WriteLine("※アカウントの最終活動日時はupdateコマンドで更新できます。");
+            Console.WriteLine("\n--------アカウント表示の色について--------");
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("黄色で表示されたアカウント\tまだフォローしていません。");
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("緑色で表示されたアカウント\tすでにフォローしています。");
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("------------------------------------\n");
+            Console.ForegroundColor = ConsoleColor.Magenta;
             Console.WriteLine("使用できるコマンド：\n");
             Console.WriteLine("gather\t新しく戸山生を収集しリストに追加します。最後に検索したところから再探索できます。");
             Console.WriteLine("show\tリスト内容を表示します。");
@@ -279,6 +352,7 @@ namespace TymFollower
             Console.WriteLine("export\t読み込んでいる戸山生リストをJSONに保存します。");
             Console.WriteLine("follow\tリストに追加された戸山生をフォローします。");
             Console.WriteLine("exit\t終了します。");
+            Console.ForegroundColor = ConsoleColor.Gray;
         }
         static void Gather(Tokens tokens, List<Tym> Tyms)
         {
